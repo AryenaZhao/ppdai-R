@@ -1,0 +1,562 @@
+---
+output:
+  html_document: default
+  word_document: default
+---
+# 拍拍贷业务探索
+### by赵亚楠
+# 摘要
+数据主要来自于拍拍贷的标的特征数据，标的还款计划和还款记录，以及客户的投资记录。
+而lcis数据中包含lc数据的所有21个字段，因为数据量的原因，
+本次分析仅选择对lcis中的数据进行探索性分析。主要分析思路包含：
+* 对所有的变量进行分布分析
+* 对使用拍拍贷的用户进行人口统计学分析，这里仅包含用户的年龄和性别。
+* 对于拍拍贷的借款类型分类。
+* 对于拍拍贷业务中的首拍比例进行分析。
+* 拍拍贷的借款金额情。
+* 借款利率分析，与借款金额，借款时间及用户评级之间是否存在联系。
+* 用户的评级和用户预期还款，借款利率的关系
+```{r global_options,include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using
+# in your analysis in this code chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk.
+# This prevents the code from displaying in the knitted HTML output.
+# You should set echo=FALSE for all code chunks in your file.
+
+library(ggplot2)
+library(gridExtra)
+library(RColorBrewer)
+library(GGally)
+library(scales)
+library(memisc)
+```
+
+```{r echo=FALSE, Load_the_Data}
+# Load the Data
+getwd()
+setwd('C:\\Users\\Administrator\\Downloads\\ppdai_3_23')
+lc <- read.csv('LC.csv',header = T,fileEncoding = "UTF-8")
+lcis <- read.csv('LCIS.csv',header = T,fileEncoding = "UTF-8")
+lp <- read.csv('LP.csv',header = T,fileEncoding = "UTF-8")
+```
+
+# Univariate Plots Section
+## 对年龄进行探索，探索年龄的分布情况
+```{r echo=FALSE, Univariate_Plots1}
+summary(lcis$年龄)
+```
+```{r echo=FALSE, Univariate_Plots2}
+ggplot(aes(x=年龄),data=lcis)+
+  geom_histogram(binwidth = 1,color = 'black', fill = '#099DD9')+
+  scale_x_continuous(limits = c(15,55))+
+  ggtitle('年龄直方图')
+```
+
+* 从年龄的分布来看，年龄呈偏态分布，更多的集中在低年龄阶段。
+* 从summary可以看出，年龄的平均值在29.35，中值为28，而75%分位值为32.中间50%的
+人数集中在25-32岁之间。
+
+## 借款金额探索性分析，探索贷款金额的分布情况
+
+```{r echo=FALSE, Univariate_Plots3}
+summary(lcis$借款金额)
+```
+```{r echo=FALSE, Univariate_Plots4}
+p1 <- ggplot(aes(x=借款金额),data=lcis)+
+  geom_histogram(binwidth = 100,color = 'black', fill = '#F79420')+
+  ggtitle('借款金额直方图')
+p2 <- ggplot(aes(x=借款金额),data=lcis)+
+  geom_histogram(binwidth = 100,color = 'black', fill = '#F79420')+
+  scale_x_continuous(limits = c(100,10000))+
+  ggtitle('借款金额直方图')
+p3 <- ggplot(aes(x=借款金额),data=lcis)+
+  geom_histogram(binwidth = 100,color = 'black', fill = '#F79420')+
+  scale_x_continuous(limits = c(2500,7500))+
+  ggtitle('借款金额直方图')
+p4 <- ggplot(aes(x=借款金额),data=lcis)+
+  geom_histogram(binwidth = 100,color = 'black', fill = '#F79420')+
+  scale_x_continuous(limits = c(10000,500000))+
+  ggtitle('借款金额直方图')
+grid.arrange(p1,p2,p3,p4)
+```
+
+* 借款金额均值为8517，中值为4107，而50%的借款金额是处于3000-7000之间。
+最高的借款金额为500000.说明拍拍贷业务更多的是小额贷款。
+* 取3000-7000之间贷款数据分析，发现整数贷款的的人数存在显著差异。
+3000,4000,5000等整额贷款人数明显偏高。可能是因为用户贷款习惯，
+也可能是贷款产品导致，原因需要具体分析。
+* 从整体的数据也可以看出整数贷款异常高的现象。
+
+```{r echo=FALSE, Univariate_Plots5}
+names(lcis)
+```
+## 借款期限进行分布分析
+```{r echo=FALSE, Univariate_Plots6}
+summary(lcis$借款期限)
+ggplot(aes(x=借款期限),data=lcis)+
+    geom_histogram(binwidth = 1,color = 'black', fill = '#099DD9')
+```
+
+* 从借款期限来看，最低的借款期限是1个月，最高的借款期限是24个月。
+* 借款期限均值为10.12.中位数为12，说明借款期限为12月的数量最多。
+* 借款期限数量比较多的其次是6个月。
+* 大部分借款期限集中在6-12个月。
+
+```{r echo=FALSE, Univariate_Plots7}
+summary(lcis$借款利率)
+table(lcis$借款利率)
+ggplot(aes(x=借款利率),data=lcis)+
+    geom_histogram(binwidth = 1,color = 'black', fill = '#099DD9')
+```
+
+* 从借款利率的分布来看，借款利率存在多种种类，最低的利率为7，最高的利率为24
+* 利率的平均值为17.78，中位数为18。
+* 利率的中间50%集中在16-20之间，而借款比较多的几笔利率为18,20,24这三种利率
+
+## 对初始评级进行分布分析
+```{r echo=FALSE, Univariate_Plots8}
+table(lcis$初始评级)
+```
+
+## 对历史成功借款次数进行分布分析
+```{r echo=FALSE, Univariate_Plots9}
+lcis$历史成功借款次数 <- as.numeric(lcis$历史成功借款次数)
+summary(lcis$历史成功借款次数)
+table(lcis$历史成功借款次数)
+ggplot(aes(x=历史成功借款次数),data=lcis)+
+    geom_histogram(binwidth = 1,color = 'black', fill = '#099DD9')
+ggplot(aes(x=历史成功借款次数),data=lcis)+
+  geom_histogram(binwidth = 1,color = 'black', fill = '#099DD9')+
+  scale_x_continuous(limits = c(2,41))
+```
+
+* 最少的借款次数是1次，最多的次数是83次，而历史借款次数最多数量是25次。
+* 从图二可以看出大部分借款次数比较集中，可以考虑集中查看原因。
+
+```{r echo=FALSE, Univariate_Plots10}
+lcis$历史成功借款金额 <- as.numeric(lcis$历史成功借款金额)
+summary(lcis$历史成功借款金额)
+ggplot(aes(x=历史成功借款金额),data=lcis)+
+    geom_histogram(binwidth = 100,color = 'black', fill = '#099DD9')+
+  scale_y_continuous(limits = c(0,15000))
+ggplot(aes(x=历史成功借款金额),data=lcis)+
+    geom_histogram(binwidth = 100,color = 'black', fill = '#099DD9')+
+  scale_y_continuous(limits = c(0,15000))+
+  scale_x_continuous(limits = c(1,10000))
+ggplot(aes(x=历史成功借款金额),data=lcis)+
+    geom_histogram(binwidth = 100,color = 'black', fill = '#099DD9')+
+  scale_y_continuous(limits = c(0,15000))+
+  scale_x_continuous(limits = c(10000,20000))
+```
+
+* 历史成功借款金额最高为19185，平均值为7878，中位数为7180，从图形可以看出，众数在11250.
+* 历史借款金额主要集中挂在10000元以上
+* 历史借款金额存在着明显的集中情况
+
+```{r}
+str(lcis)
+```
+
+```{r echo=FALSE, Univariate_Plots11}
+table(lcis$借款期限)
+table(lcis$性别)
+table(lcis$是否首标)
+table(lp$还款状态)
+table(lcis$标当前状态)
+table(lcis$标当前逾期天数)
+```
+
+# Univariate Analysis
+
+### What is the structure of your dataset?
+本数据集中主要包含3和数据集，其中lcis包含lc中的所有字段，因此主要是对lcis进行分析，在lcis中有37个字段，1个主键，其中12个市连续变量，其他的均为分类变量。  
+
+### What is/are the main feature(s) of interest in your dataset?
+借款金额，年龄，标当前逾期天数，标当前状态
+
+### What other features in the dataset do you think will help support your investigation into your feature(s) of interest?
+历史成功还款期数，历史逾期还款天数，初始评级，借款金额，是否首标
+
+### Did you create any new variables from existing variables in the dataset?
+没有
+
+### Of the features you investigated, were there any unusual distributions? Did you perform any operations on the data to tidy, adjust, or change the form of the data? If so, why did you do this?
+对于借款金额而言，75%分位是7000元，而最高借款金额是500000，而超过7000的借款人数仅为少数，这样少数的数据拉高了整体数据的平均值。结合日常情况，我们分别对2500-7500的借款金额进行分析，然后针对10000-500000的借款进行进行分布分析，发现10000以上的借款人数都低于3000人。
+对借款金额根据金额进行拆分，是因为符合我们平时对于普通大众和有钱人的区分，他们借款的金额和目的会出现差异，逾期情况可能也会不同。最重要的是，高额的借款人数过少，说明拍拍贷主要的目标群体是普通大众，因此我们主要对2500-7500元借款的用户进行分析。
+
+# Bivariate Plots Section
+```{r echo=FALSE, Bivariate_Plots1}
+# 年龄和性别的关系探索
+ggplot(aes(x=年龄),data=lcis)+
+  geom_histogram(binwidth = 1,color = 'black', fill = '#099DD9')+
+  scale_x_continuous(limits = c(15,55))+
+  ggtitle('年龄直方图')+
+  facet_wrap(~性别)
+```
+
+* 从上图可以看出，男女的年龄分布基本一致，峰值都在26-27.
+* 男性用户基本上是女性用户数量的2倍。
+
+```{r echo=FALSE, Bivariate_Plots2}
+#借款金额和性别的关系
+by(lcis$借款金额,lcis$性别,summary)
+```
+
+```{r echo=FALSE, Bivariate_Plots3}
+#借款金额和性别的关系
+m1 <- ggplot(aes(x=性别,y=借款金额),data=lcis)+
+  geom_boxplot()+
+  ggtitle('借款金额箱型图')+
+  scale_y_continuous(limits = c(0,100000))
+m2 <- ggplot(aes(x=性别,y=借款金额),data=lcis)+
+  geom_boxplot()+
+  ggtitle('借款金额箱型图')+
+  scale_y_continuous(limits = c(0,10000))
+grid.arrange(m1,m2)
+```
+
+* 男女性别在借款金额上存在差异不明显，从summary统计可以看出，男女借款的平均值，中位数基本一致。
+* 女性借款中间50%的借款金额范围更广，而男性的高额借款稍微高出女性借款数量。
+* 男性相较于女性更容易选择高额借款。
+
+```{r echo=FALSE, Bivariate_Plots4}
+#不同利率借款金额之间的关系
+ggplot(aes(x=借款利率,y=借款金额),data=lcis)+
+  geom_line(stat="summary",fun.y=sum)+
+  ggtitle('借款利率和借款金额关系图')+
+  scale_x_continuous(limits=c(6,25),breaks = seq(6,25,1))
+
+ggplot(aes(x=借款利率,y=借款金额),data=lcis)+
+  geom_point(position = 'jitter')+
+  ggtitle('借款利率和借款金额关系图')+
+  scale_x_continuous(limits=c(6,25),breaks = seq(6,25,1))
+```
+
+* 利率和借款金额之间不存在一定的关系，可能与出借的个体和金融机构有关，后期可进一步进行分析
+
+```{r echo=FALSE, Bivariate_Plots5}
+#初始评级和标当前状态的关系探索
+ggplot(aes(x=初始评级,y=length(标当前状态)),
+       data=subset(lcis,lcis$标当前状态=='逾期中'))+
+  geom_point(alpha=1/30,position = 'jitter')+
+  ggtitle('初始评级和标当前状态散点图')
+
+ggplot(aes(x=初始评级,
+           y=length(lcis$标当前状态=='逾期中')/length(lcis$标当前状态)),
+       data=lcis)+
+  geom_point(alpha=1/30,position = 'jitter')+
+  ggtitle('初始评级和标当前状态散点图')
+```
+
+* 无论是从逾期的数量看还是从逾期的比例看，初始评级和标当前状态之间无明显关系。
+
+```{r echo=FALSE, Bivariate_Plots6}
+#初始评级和标当前逾期天数的关系探索
+ggplot(aes(x=初始评级,y=标当前逾期天数),
+       data=subset(lcis,lcis$标当前状态=='逾期中'))+
+  geom_point(alpha=1/30,position = 'jitter')+
+  ggtitle('初始评级和标当前逾期天数散点图')
+```
+
+* B和C评级的用户更容易逾期，可能是因为这部分用户借款金额偏高，也可能因为信用
+* 大部分逾期维持在200天以内，200天以上的逾期比较少
+
+```{r echo=FALSE, Bivariate_Plots7}
+#借款金额和标当前逾期天数的关系探索
+ggplot(aes(x=借款金额,y=标当前逾期天数),data=subset(lcis,
+                                         lcis$标当前状态=='逾期中'))+
+  geom_line()+
+  scale_x_continuous(limits = c(100,7500))+
+  ggtitle('借款金额和标当前逾期天数散点图')+
+  geom_smooth()
+```
+
+* 目前的图形尚未发现借款金额和标当前逾期天数之间存在关系
+* 而2000-6000的借款金额出现的逾期更过，可能与借款数量多有关。
+* 从平滑线看4000的标当前逾期天数偏高。
+
+```{r echo=FALSE, Bivariate_Plots8}
+# 初始评级和历史借款金额的关系探索
+ggplot(aes(x=初始评级,y=借款金额),data=lcis)+
+  geom_boxplot()
+ggplot(aes(x=初始评级,y=借款金额),data=lcis)+
+  geom_boxplot()+
+  scale_y_continuous(limits = c(0,6000))
+```
+
+* 从上图可以看出在0-6000的小额借款中，评级为D的用户借款金额最高，这种有两种可能：
+一种是本身的评级存在问题，评级高的借款偏低，而评级低的借款偏高，
+另一种是，因为评级为D的用户因为借款金额过高才导致无法偿还借款而导致评级偏低。
+具体原因需要根据实际业务情况进行分析。
+* 也可以假设评级中等的用户更偏向于风险投资。
+
+```{r echo=FALSE, Bivariate_Plots9}
+ggplot(aes(x=借款金额,y=历史成功借款金额),data=lcis)+
+  geom_point()+
+  ggtitle('借款金额和历史成功借款金额散点图')+
+  geom_smooth()
+
+ggplot(aes(x=借款金额,y=历史成功借款金额),data=lcis)+
+  geom_point()+
+  scale_x_continuous(limits=c(0,6000))+
+  ggtitle('借款金额和历史成功借款金额散点图')+
+  geom_smooth()
+  
+ggplot(aes(x=借款金额),data=lcis)+
+  geom_histogram()+
+  scale_x_continuous(limits=c(0,6000))+
+  ggtitle('借款金额直方图')
+
+  ggplot(aes(x=历史成功借款金额),data=lcis)+
+  geom_histogram()+
+  scale_x_continuous(limits=c(0,6000))+
+  scale_y_continuous(limits = c(0,30000))+
+  ggtitle('历史成功借款金额直方图')
+```
+
+* 历史成功借款金额和进款金额之间不存在明显的相关关系，可能可以说明人们对于借贷业务的态度发生明显的变化
+* 从借贷用户上，历史成功借款的人数明显低于借款金额的人数，说明借贷业务已经慢慢被大众所接受。
+
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. How did the feature(s) of interest vary with other features in the dataset?
+
+* 男性用户的数量是女性用户数量的两倍所有，而且男女之间用户的年龄特征占比基本一致。
+* 男性和女心用户的最低借款金额，最高借款金额，25%分位借款金额，75%分位借款金额一致，男性的借款金额平均值高于女性，而女性的借款金额中位数高于男性。
+* 借款金额数量最多的借款比率是18%，而14%，16%，20%，22%这几个比率也借款金额也比较高。而借款金额和借款比例之间似乎不存在相关关系
+* 从逾期数量和初始评级之间的关系可以看出，AAA评级的逾期数最少，C级的逾期数最多。而从逾期比例来看，F级的逾期比例最低，其次是AAA即，逾期比例最高的是B级和C级。
+
+### Did you observe any interesting relationships between the other features (not the main feature(s) of interest)?
+* 发现借款金额最多用户的是3000元的借款金额，而整数的借款金额，比如4000,5000,6000,7000等借款人数明显高于其他人数。
+* 男性的高额借款比例要高于女性。
+* 使用拍拍贷的男女性别在都趋于年轻化，最要的年纪集中在23-32岁之间。
+
+### What was the strongest relationship you found?
+* 借款人数越多，发生逾期的可能性越大。
+* B/C两级发生逾期的可能性更大。
+* 两个变量间的强相关关系尚未发现
+
+
+
+# Multivariate Plots Section
+
+```{r echo=FALSE, Multivariate_Plots1}
+#借款金额&标当前逾期天数&年龄
+library(RColorBrewer)
+ggplot(aes(x=借款金额,y=标当前逾期天数,fill=年龄,color=年龄),
+       data=subset(lcis,lcis$标当前逾期天数>0))+
+  geom_point()+
+  scale_x_continuous(limits = c(100,7500))+
+  ggtitle('借款金额和标当前逾期天数&年龄散点图')
+
+ggplot(aes(x=借款金额,y=年龄,fill=标当前逾期天数,color=标当前逾期天数),
+       data=subset(lcis,lcis$标当前逾期天数>300))+
+  geom_point()+
+  scale_x_continuous(limits = c(100,7500))+
+  ggtitle('借款金额和标当前逾期天数&年龄散点图')
+
+```
+
+* 年龄在借款金额与预期天数之间不存在明显的相关关系
+* 3000.4000的借款金额，年纪小的用户更倾向于长期逾期
+
+```{r echo=FALSE, Multivariate_Plots2}
+#借款金额&标当前逾期天数&初始评级
+ggplot(aes(x=借款金额,y=标当前逾期天数,fill=初始评级,color=初始评级),
+       data=subset(lcis,lcis$标当前逾期天数>0))+
+  geom_point()+
+  scale_x_continuous(limits = c(100,7500))+
+  ggtitle('借款金额和标当前逾期天数&初始评级散点图')
+
+ggplot(aes(x=借款金额,y=标当前逾期天数,fill=初始评级,color=初始评级),
+       data=subset(lcis,(lcis$标当前逾期天数>0)&(lcis$标当前逾期天数>=300)))+
+  geom_point()+
+  scale_x_continuous(limits = c(100,7500))+
+  ggtitle('借款金额和标当前逾期天数&初始评级散点图')
+
+
+ggplot(aes(x=借款金额,y=初始评级,fill=标当前逾期天数,color=标当前逾期天数),
+       data=subset(lcis,(lcis$标当前逾期天数>0)&(lcis$标当前逾期天数>=300)))+
+  geom_point()+
+  scale_x_continuous(limits = c(100,7500))+
+  ggtitle('借款金额和标当前逾期天数&初始评级散点图')
+
+
+```
+
+* A、AA、AAA评级的用户更倾都倾向于低额借款，但是标当前逾期天数没有明显的差别。
+* C、D评级的用户表当前逾期天数拥有更长的逾期天数的可能性
+
+```{r echo=FALSE, Multivariate_Plots3}
+ggplot(aes(x=借款金额,y=标当前逾期天数,fill=借款类型,color=借款类型),
+       data=subset(lcis,lcis$标当前逾期天数>0))+
+  geom_point()+
+  scale_x_continuous(limits = c(100,7500))+
+  ggtitle('借款金额和标当前逾期天数&借款类型散点图')
+```
+
+* 借款类型可能与借款金额存在一定的关系，而且与标当前逾期天数有一定的相关
+* APP闪现价款大部分集中在0-2000，且逾期天数集中在0-300
+* 其他借款大部分集中在2000-6000，逾期集中在0-3000
+* 而普通借款借款集中在3000-5000，逾期天数偏长，0-600天之间均有分布
+* 而电商和应收安全标非常少
+
+```{r echo=FALSE, fig.height=20, fig.width=20, message=FALSE, warning=FALSE, Multivariate_Plots4}
+set.seed(20022012)
+ggcorr(lcis)
+```
+
+* 从图形可以看出标当前逾期天数与其他变量相关性较低。
+* 而借款金额其他变量的相关性也相对偏低。
+* 从图形中除了本身已经存在的相关性之外，尚未发现高相关的变量。
+
+```{r echo=FALSE, Multivariate_Plots5}
+ggplot(aes(x=借款利率,y=借款金额,color=初始评级),data=lcis)+
+  geom_line()+
+  facet_wrap(~初始评级)+
+  scale_y_continuous(limits = c(0,10000))+
+  ggtitle('借款利率&借款金额&初始评级关系')
+```
+
+* 从上图可以看出，初始评级越高，借款的利率越低。
+* AAA评级的用户利率在5%-10%之间，而评级在C之后的用户评级基本上在在15%之后。
+* 而借款金额与利率似乎没有明显的相关性。
+
+```{r echo=FALSE, Multivariate_Plots6}
+ggplot(aes(x=历史成功借款次数,y=历史成功借款金额,color=性别),data=lcis)+
+  geom_point(alpha=1/30,position = 'jitter')+
+  geom_smooth(method='lm')
+
+ggplot(aes(x=历史成功借款次数,y=log10(历史成功借款金额),color=性别),data=lcis)+
+  geom_point(alpha=1/30,position = 'jitter')+
+  geom_smooth(method='lm')
+
+ggplot(aes(x=log10(历史成功借款次数),y=log10(历史成功借款金额),color=性别),data=lcis)+
+  geom_point(alpha=1/30,position = 'jitter')+
+  geom_smooth(method='lm')
+```
+
+* 历史成功借款次数大部分集中在3次，25次，40次，50次，60次等统一的次数上
+* 性别与历史借款成功次数和历史成功借款金额之间的关系无明显差异。
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
+* 从矩阵图形和上面的图形分析，尚未发现与“标当前逾期天数”存在强相关的变量。
+* 无论是年龄，初始评级还是金额都会发生短期的逾期，但是当逾期天数达到300天及以上时，就会出现一定的规律性。
+* 当预期天数达到300天以上时，发现最初评级为C/D的用户更容易长时间逾期。
+* 初始评级越高，借款的利率越低
+
+### Were there any interesting or surprising interactions between features?
+* 借款类型不同，可能与借款金额存在一定的相关性，APP闪电的用户更倾向于借款金额2000一下，其他用户集中在2000-3000，而普通用户的借款金额在,3000-4000左右。
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the strengths and limitations of your model.
+* 没有模型，探索性分析过程中，没有发现强相关关系，可能需要对变量以及对变量的定义进行深入的研究。
+------
+
+# Final Plots and Summary
+
+### Plot One
+```{r echo=FALSE, Plot_One}
+p1 <- ggplot(aes(x=借款金额),data=lcis)+
+  geom_histogram(binwidth = 100,color = 'black', fill = '#F79420')+
+  ggtitle('借款金额直方图')
+p2 <- ggplot(aes(x=借款金额),data=lcis)+
+  geom_histogram(binwidth = 100,color = 'black', fill = '#F79420')+
+  scale_x_continuous(limits = c(100,10000))+
+  ggtitle('借款金额直方图')
+p3 <- ggplot(aes(x=借款金额),data=lcis)+
+  geom_histogram(binwidth = 100,color = 'black', fill = '#F79420')+
+  scale_x_continuous(limits = c(2500,7500))+
+  ggtitle('借款金额直方图')
+p4 <- ggplot(aes(x=借款金额),data=lcis)+
+  geom_histogram(binwidth = 100,color = 'black', fill = '#F79420')+
+  scale_x_continuous(limits = c(10000,500000))+
+  ggtitle('借款金额直方图')
+grid.arrange(p1,p2,p3,p4)
+```
+
+![1](C:/Users/Administrator/Downloads/ppdai_3_23/借款金额单变量分析.png)
+
+### Description One
+* 从单边量分析借款金额，可以看出，借款金额最低100元，最高50万不等。
+* 从第一幅图可以看出，借款金额属于长尾型数据，头部借款人数比较多，而尾部很长一段，借款金额都比较少
+* 我们对借款金额进行summary统计，发现：中位数4107，平均值为8516,而75%分位为7000。
+* 我们对借款金额进行子集化处理后，jjieku借款金额越大，借款人数大体一次减少，而整体的借款数，如3000,4000,5000,6000,7000借款人数最多。
+* 3000金额的借款人数最多，达到25000人，而超过10000的借款金额，借款最多的人数只有2000人。
+
+### Plot Two
+```{r echo=FALSE, Plot_Two}
+m1 <- ggplot(aes(x=性别,y=借款金额),data=lcis)+
+  geom_boxplot()+
+  ggtitle('借款金额箱型图')+
+  scale_y_continuous(limits = c(0,100000))
+m2 <- ggplot(aes(x=性别,y=借款金额),data=lcis)+
+  geom_boxplot()+
+  ggtitle('借款金额箱型图')+
+  scale_y_continuous(limits = c(0,10000))
+grid.arrange(m1,m2)
+```
+
+![2](C:/Users/Administrator/Downloads/ppdai_3_23/借款金额&性别.png)
+
+### Description Two
+
+* 对借款金额和性别进行分组统计，发现除了平均值和中位数不同外，其他基本一致。
+* 而目前女性用户的数量仅是男性用户的一半，在中间50%范围内，女性和男性的金钱使用水平基本一致。
+* 后期我们可以针对这部分女性用户进行关注和拉新，从而提高我们的借款流水总额。
+
+### Plot Three
+```{r echo=FALSE, Plot_Three}
+ggplot(aes(x=借款金额,y=标当前逾期天数,fill=借款类型,color=借款类型),
+       data=subset(lcis,lcis$标当前逾期天数>0))+
+  geom_point()+
+  scale_x_continuous(limits = c(100,7500))+
+  ggtitle('借款金额和标当前逾期天数&借款类型散点图')
+
+set.seed(20022012)
+ggcorr(lcis)
+
+ggplot(aes(x=借款利率,y=借款金额,color=初始评级),data=lcis)+
+  geom_line()+
+  facet_wrap(~初始评级)+
+  scale_y_continuous(limits = c(0,10000))+
+  ggtitle('借款利率&借款金额&初始评级关系')
+```
+
+![3](C:/Users/Administrator/Downloads/ppdai_3_23/1.png)
+
+![4](C:/Users/Administrator/Downloads/ppdai_3_23/借款金额&标当前逾期天数&借款类型散点图.png)
+
+![5](C:/Users/Administrator/Downloads/ppdai_3_23/2.png)
+
+
+### Description Three
+
+* 从关系矩形图可以看出，标当前逾期天数和其他的变量之间相关性较弱，没有发现很强的相关性。
+* 从借款金额&标当前逾期天数&借款类型图形可以看出，每种不同的借款类型的借款金额会表现出不同。
+* APP闪电的用户更倾向于借款金额2000一下，其他用户集中在2000-3000，而普通用户的借款金额在,3000-4000左右。
+* 其他和普通类型的借款用户会更容易出现超过300天的逾期现象。
+* 初级评级等级越高，利率越低，初级评级等级越低，利率越高。
+
+------
+
+# Reflection
+### 用户特征
+1、从性别来看，男性用户是女性用户的2倍，而在中间50%的用户水平女性和男性的借款水平基本一致。---后期我们如需要增加用户量或者业务量，女性可能是一个突破口，尤其是中间部分的女性。
+2、从年龄来看，拍拍贷的使用用户去年年轻化，最主要的使用年龄处于23-32岁之间。---年轻化是互联网金融的一种趋势，但是年轻一代的偿债能力有待考量，这也可能是逾期比较多的原因之一。后期我们可能在维持年轻人用户的基础上，更多的拓宽用户年龄段。尤其是40岁左右经济实力可以，另外又有借款需求的中年用户。
+
+### 业务现状
+1、针对逾期情况：尚未发现与标当前逾期天数强相关的变量，尤其是初始评级相关性比较低，说明我们在最初评级的标准可能需要重新考量，而且对我们借款及中间用户风险的把控，可能需要进一步的梳理。尤其是对于用户的评级标准需要细化。
+2、关于利率&借款金额：我们发现借款利率与借款金额无明显的关系，而我们的借款主要可能用于大众的小额借款和大额的创业贷款，而这两种业务可以分开指定不同的策略。
+3、针对不同的借款类型可以和上一条相结合，进行业务统一标准化。
+4、初级评级等级越高，利率越低，初级评级等级越低，利率越高。
+
+### 意见
+针对目前的业务状况，各数据间的相关关系很弱，除了初级等级评价与利率之间有明显相关之外，对于逾期变量，灭有明显变量可以预测客户逾期的可能性，因此后期需要深度挖掘逾期的相关变量，后期能够很好的预测用户的逾期可能性。重点关注，历史逾期情况、借款用途、借款金额、用户评级等变量。
